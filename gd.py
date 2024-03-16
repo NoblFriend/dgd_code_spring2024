@@ -17,9 +17,16 @@ class Worker:
         self.f : Func = func
         self.w = None
         self.compress_op = lambda x: x
+        self.error = 0
 
     def get_gradient(self):
         return self.compress_op(self.f.grad(self.w))
+    
+    def get_gradient_ef21(self):
+        c = self.compress_op(self.f.grad(self.w) - self.error)
+        self.error += c
+        return c
+
 
 class DistributedGD:
     def __init__(self, workers, step):
@@ -43,6 +50,24 @@ class DistributedGD:
                 worker.w = w
 
             self.history.append(w)
+
+    def run_ef21(self, num_iter, w0):
+        for worker in self.workers:
+            worker.w = w0
+        w = w0
+        mean_grad = 0
+        for k in range(num_iter):
+            mean_add = np.mean([worker.get_gradient_ef21() for worker in self.workers], axis=0)
+            mean_grad += mean_add
+            print([np.linalg.norm(mean_add), (np.linalg.norm(mean_grad))])
+            w = w - self.step(w, k) * mean_grad
+            #print(w[0])
+
+            for _, worker in enumerate(self.workers):
+                    worker.w = w
+
+            self.history.append(w)
+
 
 
 def create_worker_func(f : Func, *args):
