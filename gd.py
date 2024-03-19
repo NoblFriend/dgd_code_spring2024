@@ -37,6 +37,11 @@ class DistributedGD:
             self.step = step
         self.history = []
 
+    def reset(self):
+        self.history = []
+        for worker in self.workers:
+            worker.w = None
+            worker.error = 0
 
     def run(self, num_iter, w0):
         for worker in self.workers:
@@ -59,9 +64,7 @@ class DistributedGD:
         for k in range(num_iter):
             mean_add = np.mean([worker.get_gradient_ef21() for worker in self.workers], axis=0)
             mean_grad += mean_add
-            #print([np.linalg.norm(mean_add), (np.linalg.norm(mean_grad))])
             w = w - self.step(w, k) * mean_grad
-            #print(w[0])
 
             for _, worker in enumerate(self.workers):
                     worker.w = w
