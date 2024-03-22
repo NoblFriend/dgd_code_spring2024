@@ -51,3 +51,6 @@ def natural_dithering_op(n, p=2, b=2):
 
 def svd_approximation_low_rank_compression_op(rank=2):
     return lambda arr: svd_approximation_low_rank_compression(arr, rank)
+
+def identity_op():
+    return lambda arr: arr
