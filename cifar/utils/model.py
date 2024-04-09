@@ -1,4 +1,6 @@
 import torch.nn as nn
+import torch
+import torch.nn.init as init
 
 
 class VGG(nn.Module):
@@ -26,3 +28,15 @@ class VGG(nn.Module):
                 in_channels = x
         layers += [nn.AvgPool2d(kernel_size=1, stride=1)]
         return nn.Sequential(*layers)
+
+import torch.nn as nn
+
+class LogisticRegression(nn.Module):
+    def __init__(self, input_size, num_classes):
+        super(LogisticRegression, self).__init__()
+        self.classifier = nn.Linear(input_size, num_classes, bias=False)
+        init.constant_(self.classifier.weight, 0)
+
+    def forward(self, x):
+        out = self.classifier(x)
+        return out.squeeze()
