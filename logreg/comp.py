@@ -1,4 +1,45 @@
 import numpy as np
+from scipy.linalg import svd
+
+
+def unfold(tensor, mode):
+    sz = range(len(tensor.shape))
+    new_tensor = np.moveaxis(tensor, sz, np.roll(sz, mode))
+    return np.reshape(new_tensor, (tensor.shape[mode], -1))
+
+def hosvd_approx(tensor, ranks):
+    U_matrices = []
+
+    core_tensor = tensor
+    for mode in range(len(tensor.shape)):
+        U, _, _ = svd(unfold(tensor, mode), full_matrices=False)
+        U_full = np.zeros_like(U)
+        min_dim = min(U.shape[1], ranks[mode])
+        U_full[:, :min_dim] = U[:, :min_dim]
+
+        U_matrices.append(U_full)
+
+        core_tensor = np.moveaxis(
+            np.tensordot(core_tensor, U_full.T, axes=[mode, 1]), -1, mode
+        )
+    
+    tensor = core_tensor
+
+    for mode, U in enumerate(U_matrices):
+        tensor = np.moveaxis(np.tensordot(tensor, U, axes=[mode, 1]), -1, mode)
+
+    return tensor
+
+def hosvd_approximation_low_rank_compression(arr, rank):
+    #print(arr)
+    X_matrix = arr.reshape(7, 2, 2, 2, 2)
+    x_compressed = hosvd_approx(X_matrix, [1, 1, 1, 1, 1])
+    x_compressed = x_compressed.flatten()
+    #print(x_compressed)
+    return x_compressed
+
+def hosvd_approximation_low_rank_compression_op(rank=1):
+    return lambda arr: hosvd_approximation_low_rank_compression(arr, rank)
 
 def top_k(k, arr):
     new_arr = arr.copy()
