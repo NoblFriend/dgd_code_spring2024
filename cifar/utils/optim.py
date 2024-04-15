@@ -18,5 +18,5 @@ class GD(torch.optim.Optimizer):
                 with torch.no_grad():
                     grad = p.grad
                     if weight_decay != 0:
-                        grad.add_(p, alpha=weight_decay)
+                        grad.add_(p, alpha=weight_decay) # grad += p * weight_decay
                     p.sub_(grad, alpha=lr)

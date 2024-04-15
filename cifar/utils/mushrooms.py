@@ -6,8 +6,8 @@ from torch.utils.data import Dataset, DataLoader
 
 class MushroomsDataset(Dataset):
     def __init__(self, X, y):
-        self.X = torch.tensor(X, dtype=torch.float32)
-        self.y = torch.tensor(y, dtype=torch.float32)
+        self.X = torch.tensor(X, dtype=torch.float64)
+        self.y = torch.tensor(y, dtype=torch.float64)
 
     def __len__(self):
         return len(self.y)

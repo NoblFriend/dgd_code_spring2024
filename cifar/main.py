@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 
-from utils.data import get_train_data, get_test_dataloader
+from utils.data import get_train_dataloader, get_test_dataloader
 from utils.model import VGG
 from utils.optim import GD
 from utils.worker import setup_workers
@@ -22,50 +22,33 @@ if __name__ == '__main__':
     optimizer = GD(model.parameters(), lr=0.01)
 
     testloader = get_test_dataloader()
-
-    workers = setup_workers(
-        model=model,
-        criterion=criterion,
-        dataset=get_train_data(), 
-        num_workers=1,
-        batch_size=128
-    )
+    trainloader = get_train_dataloader()
 
     num_epochs = 10
     accuracies = []
     max_idx = 0
     for epoch in range(num_epochs):
-        print(f"Starting epoch {epoch+1}")
-        for idx, grads_tuple in enumerate(zip_longest(*[worker.gradient_generator() for worker in workers])):
-            print(f"step {idx}")
-            max_idx = max(idx, max_idx)
+        print(f"Starting epoch {epoch+1}") 
+        for i, data in enumerate(trainloader, 0):
+            inputs, labels = data
+            print(f"step {i}")
+
             model.zero_grad()
-            num_grads = 0
-            for grads in filter(None, grads_tuple):
-                num_grads += 1
-                alpha = 1/(num_grads)
-                for name, param in model.named_parameters():
-                    if param.requires_grad:
-                        if  param.grad == None:
-                            param.grad = grads[name]
-                        else:
-                            param.grad = alpha * grads[name] + (1-alpha)*param.grad
+
+            output = model(inputs)
+            loss = criterion(output, labels)
+            loss.backward()
 
             optimizer.step()
 
 
         accuracies.append( compute_accuracy(model, testloader))
-        # Сохранение графика accuracy
-        plt.figure(figsize=(10, 6))
-        plt.plot(accuracies, label="Accuracy", marker='o')
-        plt.xlabel("Step")
-        plt.ylabel("Accuracy")
-        plt.title("Accuracy vs. Steps")
-        plt.legend()
-        plt.grid(True)
         
-        # Сохранение графика в файл
-        plt.savefig(os.path.join(graphs_dir, f"epoch-{epoch+1}.png"))
-        plt.close()
-        print(f"Epoch {epoch+1}/{num_epochs} completed.")
+plt.figure(figsize=(7, 4))
+plt.plot(accuracies)
+plt.xlabel("Epoch")
+plt.ylabel("Accuracy")
+plt.title("Accuracy vs. Epoch")
+plt.grid(True)
+plt.show()
 
