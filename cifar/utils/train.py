@@ -1,5 +1,15 @@
-import torch
 import os
+import torch
+import torch.nn as nn
+import matplotlib.pyplot as plt
+
+from utils.data import get_train_dataloader, get_test_dataloader
+from utils.model import VGG
+from utils.optim import GD
+from utils.ef21 import EF21
+from utils.operators import top_k_op, hosvd_compression_op
+from utils.criterions import compute_accuracy, compute_gradient_norm
+
 
 def save_training_data(data, path):
     existing_data = load_training_data(path) if os.path.exists(path) else None
@@ -32,3 +42,52 @@ def find_last_checkpoint(model_dir, compression_op_name):
         last_epoch = max(int(f.split('_')[-1].split('.')[0]) for f in checkpoints)
         return os.path.join(model_dir, f"{compression_op_name}_epoch_{last_epoch}.pt"), last_epoch
     return None, 0
+
+def run_training(compression_op_name, compression_op, num_epochs, model_dir='./models', data_dir='./w', device = 'mps'):
+    model = VGG().to(device)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = GD(model.parameters(), lr=0.1)
+    ef_method = EF21(model.named_parameters())
+    ef_method.compression_operator = compression_op
+
+    trainloader = get_train_dataloader()
+
+    start_epoch = 0
+    checkpoint_path, start_epoch = find_last_checkpoint(
+        model_dir, compression_op_name)
+    if checkpoint_path:
+        model, optimizer = load_model_and_optimizer(
+            model, optimizer, ef_method, checkpoint_path)
+
+    losses = []
+    gradient_norms = []
+    accuracies = []
+
+    for epoch in range(start_epoch, start_epoch + num_epochs):
+        print(f"Starting epoch {epoch+1} with {compression_op_name}")
+        for batch_idx, (inputs, targets) in enumerate(trainloader):
+            inputs, targets = inputs.to(device), targets.to(device)
+
+            optimizer.zero_grad()
+            output = model(inputs)
+            loss = criterion(output, targets)
+            loss.backward()
+
+            gradient_norms.append(compute_gradient_norm(model))
+            losses.append(loss.item())
+
+            ef_method.step()
+            optimizer.step()
+
+        accuracies.append(compute_accuracy(model, trainloader, device))
+
+    save_model_and_optimizer(model, optimizer, ef_method, os.path.join(
+        model_dir, f"{compression_op_name}_epoch_{epoch+1}.pt"))
+
+    data = {
+        'losses': losses,
+        'gradient_norms': gradient_norms,
+        'accuracies': accuracies
+    }
+    save_training_data(data, os.path.join(
+        data_dir, f"{compression_op_name}_training_data.pt"))
