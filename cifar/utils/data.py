@@ -23,7 +23,7 @@ def get_train_dataloader():
                 ),
             ])
         ),
-        batch_size=128,
+        batch_size=256,
         shuffle=False,
         num_workers=0
     )
