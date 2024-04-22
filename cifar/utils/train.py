@@ -7,7 +7,6 @@ from utils.data import get_train_dataloader, get_test_dataloader
 from utils.model import VGG
 from utils.optim import GD
 from utils.ef21 import EF21
-from utils.operators import top_k_op, hosvd_compression_op
 from utils.criterions import compute_accuracy, compute_gradient_norm
 
 
@@ -47,8 +46,8 @@ def run_training(compression_op_name, compression_op, num_epochs, model_dir='./m
     model = VGG().to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = GD(model.parameters(), lr=0.1)
-    ef_method = EF21(model.named_parameters())
-    ef_method.compression_operator = compression_op
+    ef_method = EF21(list(model.named_parameters()))
+    ef_method.comp_operator = compression_op
 
     trainloader = get_train_dataloader()
 
@@ -87,7 +86,8 @@ def run_training(compression_op_name, compression_op, num_epochs, model_dir='./m
     data = {
         'losses': losses,
         'gradient_norms': gradient_norms,
-        'accuracies': accuracies
+        'accuracies': accuracies,
+        'comp_factors': ef_method.comp_factors
     }
     save_training_data(data, os.path.join(
         data_dir, f"{compression_op_name}_training_data.pt"))
