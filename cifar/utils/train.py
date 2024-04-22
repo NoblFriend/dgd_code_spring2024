@@ -48,7 +48,7 @@ def run_training(compression_op_name, compression_op, num_epochs, model_dir='./m
     model = VGG().to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = GD(model.parameters(), lr=0.1)
-    ef_method = EF21(model.named_parameters())
+    ef_method = EF21(list(model.named_parameters()))
     ef_method.compression_operator = compression_op
 
     trainloader = get_train_dataloader()
@@ -76,6 +76,10 @@ def run_training(compression_op_name, compression_op, num_epochs, model_dir='./m
 
             gradient_norms.append(compute_gradient_norm(model))
             losses.append(loss.item())
+
+
+            # for name, param in model.named_parameters():
+            #     print(name, param.size())
 
             ef_method.step()
             optimizer.step()

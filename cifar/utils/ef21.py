@@ -8,9 +8,8 @@ class EF21:
 
     def step(self):
         for name, param in self._params:
-            comp_grad = self.compression_operator(param.grad.detach() - self._comp_err[name])
-            self._comp_err[name] += comp_grad
-            param.grad = comp_grad
+            self._comp_err[name] += self.compression_operator(param.grad.detach() - self._comp_err[name])
+            param.grad = self._comp_err[name]
 
     def get_compression_errors(self):
         return {name: err.clone() for name, err in self._comp_err.items()}

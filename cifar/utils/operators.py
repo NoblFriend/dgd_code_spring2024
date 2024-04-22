@@ -1,4 +1,55 @@
 import torch
+import tensorly as tl
+from tensorly.decomposition import tucker
+from tensorly.decomposition import tensor_train
+
+tl.set_backend('pytorch')
+
+def tucker_decomposition(tensor, ranks):
+    core, factors = tucker(tensor, rank=list(ranks))
+    reconstructed_tensor = tl.tucker_to_tensor((core, factors))
+    return reconstructed_tensor
+
+def tucker_compression_op(target_dim=15):
+    def compress(tensor):
+        original_shape = tensor.shape
+        new_shape = []
+
+        # Adjust each dimension by dividing it until it reaches the target dimension size
+        for dim in original_shape:
+            while dim > target_dim:
+                if dim % 8 == 0:
+                    new_shape.append(8)
+                    dim //= 8
+                else:
+                    break
+            new_shape.append(dim)
+
+        significant_dims = [dim for dim in new_shape if dim > 1]
+        if len(significant_dims) < 2:
+            return tensor
+
+        # Reshape the tensor to the new shape
+        tensor = tensor.reshape(new_shape)
+
+        # Determine ranks for Tucker decomposition
+        # Here, ranks are set to min(2, size of dimension) for simplicity
+        ranks = [min(4, s) for s in new_shape]
+
+        # dim = len(ranks)
+        # if dim < 3:
+        #     ranks = ranks + [1] * (3 - dim)
+        # print(ranks)
+        # Perform Tucker decomposition and reconstruction
+        reconstructed_tensor = tucker_decomposition(tensor, ranks)
+
+        # Reshape the reconstructed tensor back to the original shape
+        reconstructed_tensor = reconstructed_tensor.reshape(original_shape)
+
+        return reconstructed_tensor
+
+    return compress
+
 
 def top_k(k, tensor):
     new_tensor = tensor.clone()
@@ -38,9 +89,9 @@ def hosvd_compression_op(target_dim=16):
         # Перебираем каждое измерение и делим его на 2 до достижения целевого размера
         for dim in original_shape:
             while dim > target_dim:
-                if dim % 2 == 0:
-                    new_shape.append(2)
-                    dim //= 2
+                if dim % 4 == 0:
+                    new_shape.append(4)
+                    dim //= 4
                 else:
                     new_shape.append(dim)
                     break
@@ -53,6 +104,8 @@ def hosvd_compression_op(target_dim=16):
         ranks = [min(2, s) for s in new_shape]
 
         # Выполняем HOSVD
-        return hosvd(tensor, ranks)
+        reconstructed_tensor = hosvd(tensor, ranks)
+        reconstructed_tensor = reconstructed_tensor.reshape(original_shape)
+        return reconstructed_tensor
 
     return compress
