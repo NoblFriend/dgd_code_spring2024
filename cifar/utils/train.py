@@ -76,11 +76,7 @@ def run_training(compression_op_name, compression_op, num_epochs, model_dir='./m
 
             gradient_norms.append(compute_gradient_norm(model))
             losses.append(loss.item())
-
-
-            # for name, param in model.named_parameters():
-            #     print(name, param.size())
-
+            
             ef_method.step()
             optimizer.step()
 

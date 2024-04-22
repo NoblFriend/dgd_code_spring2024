@@ -10,17 +10,16 @@ def tucker_decomposition(tensor, ranks):
     reconstructed_tensor = tl.tucker_to_tensor((core, factors))
     return reconstructed_tensor
 
-def tucker_compression_op(target_dim=15):
+def tucker_compression_op(target_dim=32):
     def compress(tensor):
         original_shape = tensor.shape
         new_shape = []
 
-        # Adjust each dimension by dividing it until it reaches the target dimension size
         for dim in original_shape:
             while dim > target_dim:
-                if dim % 8 == 0:
-                    new_shape.append(8)
-                    dim //= 8
+                if dim % 32 == 0:
+                    new_shape.append(32)
+                    dim //= 32
                 else:
                     break
             new_shape.append(dim)
@@ -29,27 +28,49 @@ def tucker_compression_op(target_dim=15):
         if len(significant_dims) < 2:
             return tensor
 
-        # Reshape the tensor to the new shape
         tensor = tensor.reshape(new_shape)
 
-        # Determine ranks for Tucker decomposition
-        # Here, ranks are set to min(2, size of dimension) for simplicity
-        ranks = [min(4, s) for s in new_shape]
+        ranks = [min(25, s) for s in new_shape]
 
-        # dim = len(ranks)
-        # if dim < 3:
-        #     ranks = ranks + [1] * (3 - dim)
-        # print(ranks)
-        # Perform Tucker decomposition and reconstruction
         reconstructed_tensor = tucker_decomposition(tensor, ranks)
-
-        # Reshape the reconstructed tensor back to the original shape
         reconstructed_tensor = reconstructed_tensor.reshape(original_shape)
 
         return reconstructed_tensor
 
     return compress
 
+def tt_svd_decomposition(tensor, max_rank):
+    tt_tensor = tensor_train(tensor, rank=max_rank)
+    reconstructed_tensor = tl.tt_to_tensor(tt_tensor)
+    return reconstructed_tensor
+
+def tt_svd_compression_op(max_rank=25, target_dim=32):
+    def compress(tensor):
+        original_shape = tensor.shape
+        new_shape = []
+
+        for dim in original_shape:
+            while dim > target_dim:
+                if dim % target_dim == 0:
+                    new_shape.append(target_dim)
+                    dim //= target_dim
+                else:
+                    break
+            new_shape.append(dim)
+
+        significant_dims = [dim for dim in new_shape if dim > 1]
+        if len(significant_dims) < 2:
+            return tensor
+
+        tensor = tensor.reshape(new_shape)
+        ranks = [min(max_rank, s) for s in new_shape] + [1]
+        ranks[0] = 1
+
+        reconstructed_tensor = tt_svd_decomposition(tensor, ranks)
+        reconstructed_tensor = reconstructed_tensor.reshape(original_shape)
+        return reconstructed_tensor
+
+    return compress
 
 def top_k(k, tensor):
     new_tensor = tensor.clone()
