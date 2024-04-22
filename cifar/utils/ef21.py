@@ -11,3 +11,11 @@ class EF21:
             comp_grad = self.compression_operator(param.grad.detach() - self._comp_err[name])
             self._comp_err[name] += comp_grad
             param.grad = comp_grad
+
+    def get_compression_errors(self):
+        return {name: err.clone() for name, err in self._comp_err.items()}
+
+    def load_compression_errors(self, comp_err_dict):
+        for name, err in comp_err_dict.items():
+            if name in self._comp_err:
+                self._comp_err[name].copy_(err)
