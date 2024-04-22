@@ -216,3 +216,5 @@ ENV/
 cifar/data/
 cifar/models/
 cifar/w/
+
+1.py

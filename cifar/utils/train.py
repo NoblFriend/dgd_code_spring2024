@@ -1,4 +1,5 @@
 import os
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
@@ -74,7 +75,7 @@ def run_training(compression_op_name, compression_op, num_epochs, model_dir='./m
 
             gradient_norms.append(compute_gradient_norm(model))
             losses.append(loss.item())
-
+            
             ef_method.step()
             optimizer.step()
 
