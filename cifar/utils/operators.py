@@ -11,34 +11,48 @@ def top_k_op(k):
     return lambda t: top_k(k, t)
 
 def hosvd(tensor, ranks):
-    """ Perform higher-order singular value decomposition (HOSVD) on a tensor. """
+    # Assuming the tensor is at least 2D and ranks are correctly set
     U_matrices = []
     core_tensor = tensor.clone()
 
     for mode in range(tensor.dim()):
-        # Unfold the tensor along the specified mode
-        unfolded = tensor.permute(mode, *[i for i in range(tensor.dim()) if i != mode]).reshape(tensor.shape[mode], -1)
-        # Compute the SVD of the unfolded matrix
-        U, S, V = torch.svd(unfolded, some=True)  # Use some=True to compute the reduced SVD
-        # Reduce U to the specified rank
+        unfolded = tensor.unfold(mode, size=ranks[mode], step=ranks[mode])
+        U, S, V = torch.svd(unfolded, some=True)
         U_reduced = U[:, :ranks[mode]]
         U_matrices.append(U_reduced)
-        # Reduce the core tensor by projecting onto the reduced U matrix
-        core_tensor = (U_reduced.t() @ unfolded).reshape((ranks[mode],) + tensor.shape[1:mode+1] + tensor.shape[mode+1:])
-        tensor = core_tensor.permute(1, *range(2, tensor.dim()), 0)
+        core_tensor = torch.tensordot(U_reduced.t(), unfolded, dims=([1], [mode]))
 
-    # Reconstruct the tensor from the core tensor and the U matrices
-    for i, U in enumerate(U_matrices):
-        core_tensor = core_tensor.permute(-1, *range(core_tensor.dim() - 1))
-        core_tensor = U @ core_tensor.reshape(U.shape[1], -1)
-        core_tensor = core_tensor.reshape(tensor.shape)
+    reconstructed_tensor = core_tensor
+    for i, U in enumerate(reversed(U_matrices)):
+        reconstructed_tensor = torch.tensordot(reconstructed_tensor, U, dims=([0], [0]))
+        permute_dims = list(range(1, reconstructed_tensor.dim())) + [0]
+        reconstructed_tensor = reconstructed_tensor.permute(permute_dims)
 
-    return core_tensor
+    return reconstructed_tensor
 
-def hosvd_compression_op():
-    """ Return a compression operator for HOSVD with automatic rank determination based on tensor dimensions. """
+def hosvd_compression_op(target_dim=16):
     def compress(tensor):
-        # Set ranks to 2 for each dimension, or to the dimension size if it is less than 2
-        ranks = [min(2, s) for s in tensor.shape]
+        original_shape = tensor.shape
+        new_shape = []
+
+        # Перебираем каждое измерение и делим его на 2 до достижения целевого размера
+        for dim in original_shape:
+            while dim > target_dim:
+                if dim % 2 == 0:
+                    new_shape.append(2)
+                    dim //= 2
+                else:
+                    new_shape.append(dim)
+                    break
+            new_shape.append(dim)
+
+        # Изменяем форму тензора
+        tensor = tensor.reshape(new_shape)
+
+        # Определение рангов для HOSVD
+        ranks = [min(2, s) for s in new_shape]
+
+        # Выполняем HOSVD
         return hosvd(tensor, ranks)
+
     return compress
