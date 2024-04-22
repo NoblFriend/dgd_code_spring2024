@@ -1,8 +1,11 @@
 from typing import Tuple, List
 import torch
+from utils.linalg.hosvd import sthosvd
 import tensorly as tl
 from tensorly.decomposition import tucker
 from tensorly.decomposition import tensor_train
+
+PYTORCH_ENABLE_MPS_FALLBACK=1
 
 tl.set_backend('pytorch')
 
@@ -152,3 +155,36 @@ class TopK(CompOp):
         mask[indices] = True
         self.data_size = self.k
         return tensor * mask.view_as(tensor)
+    
+
+class HOSVD(CompOp):
+    def __init__(self):
+        pass
+
+    def _make_dims(self, shape):
+        new_shape = []
+        for dim in shape:
+            for div in [4, 5]:
+                while dim % div == 0:
+                    new_shape.append(div)
+                    dim //= div
+            if dim > 1:  
+                new_shape.append(dim)
+        return new_shape
+
+
+    def __call__(self, tensor: torch.Tensor):
+        shape = tensor.shape
+        new_shape = self._make_dims(shape)
+
+        tensor = tensor.view(*new_shape)
+
+        core, svecs, _ = sthosvd(tensor, [3] * len(new_shape))
+
+        reconstructed = tl.tucker_to_tensor((core, svecs)).reshape(shape)
+
+        self.data_size = core.numel()
+        for sv in svecs:
+            self.data_size += sv.numel()
+
+        return reconstructed
