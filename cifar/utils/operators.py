@@ -150,7 +150,7 @@ class TopK(CompOp):
 
     def __call__(self, tensor):
         abs_tensor = torch.abs(tensor)
-        _, indices = torch.topk(abs_tensor.view(-1), self.k, sorted=False)
+        _, indices = torch.topk(abs_tensor.view(-1), min(self.k, abs_tensor.numel()), sorted=False)
         mask = torch.zeros_like(abs_tensor, dtype=torch.bool).view(-1)
         mask[indices] = True
         self.data_size = self.k
