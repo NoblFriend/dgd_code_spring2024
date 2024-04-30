@@ -12,15 +12,13 @@ from utils.criterions import compute_accuracy, compute_gradient_norm
 
 
 def save_training_data(data, path):
-    existing_data = load_training_data(path) if os.path.exists(path) else None
+    existing_data =  torch.load(path) if os.path.exists(path) else None
     if existing_data:
         for key in data:
             existing_data[key].extend(data[key])
         data = existing_data
     torch.save(data, path)
 
-def load_training_data(path):
-    return torch.load(path)
 
 def save_model_and_optimizer(model, optimizer, ef_model, path):
     torch.save({
