@@ -41,15 +41,16 @@ class HOSVD(CompOp):
     def __init__(self):
         pass
 
-    def _make_dims(self, shape):
+   def _make_dims(self, shape, target_dim):
         new_shape = []
         for dim in shape:
-            for div in [4, 5]:
-                while dim % div == 0:
-                    new_shape.append(div)
-                    dim //= div
-            if dim > 1:  
-                new_shape.append(dim)
+            while dim > target_dim:
+                if dim % target_dim == 0:
+                    new_shape.append(target_dim)
+                    dim //= target_dim
+                else:
+                    break
+            new_shape.append(dim)
         return new_shape
 
 
