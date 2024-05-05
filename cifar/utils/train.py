@@ -42,6 +42,8 @@ def find_last_checkpoint(model_dir, compression_op_name):
     return None, 0
 
 def run_training(compression_op_name, compression_op, num_epochs, model_dir='./models', data_dir='./w', device = 'mps'):
+    if num_epochs == 0: 
+        return
     model = VGG().to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = GD(model.parameters(), lr=0.1)

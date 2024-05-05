@@ -4,6 +4,7 @@ from utils.linalg.hosvd import sthosvd
 import tensorly as tl
 from tensorly.decomposition import tucker
 from tensorly.decomposition import tensor_train
+from math import log2, ceil
 
 PYTORCH_ENABLE_MPS_FALLBACK=1
 
@@ -127,3 +128,37 @@ class HOSVD(CompOp):
 
         reconstructed = tl.tucker_to_tensor((core, svecs)).reshape(shape)
         return reconstructed        
+
+class NaturalDithering(CompOp):
+    def __init__(self, n, p=2, b=2):
+        self.n = n
+        self.p = p
+        self.b = b
+        self.create_seq(n)
+    
+    def create_seq(self, n,  b=2):
+        powers = torch.arange(-n, n, dtype=torch.float32)
+        self.levels = torch.pow(b, -powers)
+        self.delta = ceil(log2(2*n+1) + 1)/32
+
+    def __call__(self, tensor: torch.Tensor):
+        if self.levels.device != tensor.device:
+            self.levels = self.levels.to(tensor.device)
+        norm_p = tensor.norm("fro")
+        dithered_tensor = torch.zeros_like(tensor)
+        scaled_tensor = torch.abs(tensor) / norm_p
+        
+        # Expand levels to match the number of elements in scaled_tensor
+        expanded_levels = self.levels.unsqueeze(0).expand(scaled_tensor.numel(), -1)
+        
+        # Calculate the index of the closest level for each element
+        differences = torch.abs(expanded_levels - scaled_tensor.view(-1, 1))
+        closest_levels_idx = torch.argmin(differences, dim=1)
+        closest_levels = self.levels[closest_levels_idx]
+        
+        # Set the dithered values
+        dithered_tensor.view(-1).copy_(torch.sign(tensor).view(-1) * closest_levels * norm_p)
+        
+        self.data_size = self.delta * tensor.numel()
+        
+        return dithered_tensor
