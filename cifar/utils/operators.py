@@ -38,62 +38,28 @@ class TopK(CompOp):
         mask[indices] = True
         self.data_size = k
         return tensor * mask.view_as(tensor)
-    
 
-class HOSVD(CompOp):
-    def __init__(self):
-        pass
+def _make_dims(shape, target_dim):
+    new_shape = []
+    for dim in shape:
+        while dim > target_dim:
+            if dim % target_dim == 0:
+                new_shape.append(target_dim)
+                dim //= target_dim
+            else:
+                break
+        new_shape.append(dim)
+    return new_shape
 
-    def _make_dims(self, shape, target_dim):
-        new_shape = []
-        for dim in shape:
-            while dim > target_dim:
-                if dim % target_dim == 0:
-                    new_shape.append(target_dim)
-                    dim //= target_dim
-                else:
-                    break
-            new_shape.append(dim)
-        return new_shape
-
-
-    def __call__(self, tensor: torch.Tensor):
-        shape = tensor.shape
-        new_shape = self._make_dims(shape)
-
-        tensor = tensor.view(*new_shape)
-
-        core, svecs, _ = sthosvd(tensor, [3] * len(new_shape))
-
-        reconstructed = tl.tucker_to_tensor((core, svecs)).reshape(shape)
-
-        self.data_size = core.numel()
-        for sv in svecs:
-            self.data_size += sv.numel()
-
-        return reconstructed
     
 class TTSVD(CompOp):
     def __init__(self, max_rank = 25, target_dim = 32):
         self.target_dim = target_dim
         self.max_rank = max_rank
 
-    def _make_dims(self, shape, target_dim):
-        new_shape = []
-        for dim in shape:
-            while dim > target_dim:
-                if dim % target_dim == 0:
-                    new_shape.append(target_dim)
-                    dim //= target_dim
-                else:
-                    break
-            new_shape.append(dim)
-        return new_shape
-
-
     def __call__(self, tensor: torch.Tensor):
         shape = tensor.shape
-        new_shape = self._make_dims(shape, self.target_dim)
+        new_shape = _make_dims(shape, self.target_dim)
 
         significant_dims = [dim for dim in new_shape if dim > 1]
         if len(significant_dims) < 2:
@@ -118,22 +84,9 @@ class TuckerOp(CompOp):
         self.target_dim = target_dim
         self.max_rank = max_rank
 
-    def _make_dims(self, shape, target_dim):
-        new_shape = []
-        for dim in shape:
-            while dim > target_dim:
-                if dim % target_dim == 0:
-                    new_shape.append(target_dim)
-                    dim //= target_dim
-                else:
-                    break
-            new_shape.append(dim)
-        return new_shape
-
-
     def __call__(self, tensor: torch.Tensor):
         shape = tensor.shape
-        new_shape = self._make_dims(shape, self.target_dim)
+        new_shape = _make_dims(shape, self.target_dim)
 
         significant_dims = [dim for dim in new_shape if dim > 1]
         if len(significant_dims) < 2:
@@ -150,3 +103,27 @@ class TuckerOp(CompOp):
         reconstructed_tensor = tl.tucker_to_tensor((core, factors))
         reconstructed_tensor = reconstructed_tensor.reshape(shape)
         return reconstructed_tensor
+    
+class HOSVD(CompOp):
+    def __init__(self, max_rank = 25, target_dim = 32):
+        self.target_dim = target_dim
+        self.max_rank = max_rank
+
+    def __call__(self, tensor: torch.Tensor):
+        shape = tensor.shape
+        new_shape = _make_dims(shape)
+
+        significant_dims = [dim for dim in new_shape if dim > 1]
+        if len(significant_dims) < 2:
+            return tensor
+
+        tensor = tensor.view(*new_shape)
+        ranks = [min(25, s) for s in new_shape]
+
+        core, svecs, _ = sthosvd(tensor, ranks)
+        self.data_size = core.numel()
+        for sv in svecs:
+            self.data_size += sv.numel()
+
+        reconstructed = tl.tucker_to_tensor((core, svecs)).reshape(shape)
+        return reconstructed        
