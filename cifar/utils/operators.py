@@ -25,15 +25,18 @@ class ID(CompOp):
         return tensor
 
 class TopK(CompOp):
-    def __init__(self, k):
-        self.k = k 
+    def __init__(self, delta):
+        if not (0 < delta <= 1):
+            raise ValueError("comp factor must be in (0;1]")
+        self.delta = delta
 
     def __call__(self, tensor):
+        k = self.delta * abs_tensor.numel()
         abs_tensor = torch.abs(tensor)
-        _, indices = torch.topk(abs_tensor.view(-1), min(self.k, abs_tensor.numel()), sorted=False)
+        _, indices = torch.topk(abs_tensor.view(-1), k, sorted=False)
         mask = torch.zeros_like(abs_tensor, dtype=torch.bool).view(-1)
         mask[indices] = True
-        self.data_size = self.k
+        self.data_size = k
         return tensor * mask.view_as(tensor)
     
 
@@ -41,7 +44,7 @@ class HOSVD(CompOp):
     def __init__(self):
         pass
 
-   def _make_dims(self, shape, target_dim):
+    def _make_dims(self, shape, target_dim):
         new_shape = []
         for dim in shape:
             while dim > target_dim:
