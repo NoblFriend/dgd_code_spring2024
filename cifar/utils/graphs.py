@@ -1,22 +1,10 @@
-import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib.pyplot as plt
 import torch
-
-
-def make_plot(ax, data, plot_type, label, plot_func):
-    x_values = np.cumsum(data['comp_factors'])[::len(data['comp_factors'])//len(data[plot_type])]
-    if plot_func == 'semilogy':
-        ax.semilogy(x_values, data[plot_type], label=f'{label} {plot_type}')
-    else:
-        ax.plot(x_values, data[plot_type], label=f'{label} {plot_type}')
-    ax.set_xlabel('Cumulative Comp Factor')
-    ax.set_ylabel(plot_type.capitalize())
-    ax.legend()
-    ax.grid(True)
+import pandas as pd
 
 def plot_training_results(compression_operators, data_dir="./w"):
     plt.figure(figsize=(18, 6))
-    # plot_types = ['gradient_norms', 'losses', 'accuracies']
     plot_types = ['gradient_norms', 'losses', 'accuracies']
 
     for i, plot_type in enumerate(plot_types, 1):
@@ -30,43 +18,29 @@ def plot_training_results(compression_operators, data_dir="./w"):
     plt.tight_layout()
     plt.show()
 
+def make_plot(ax, data, plot_type, label, plot_func, window=100):
+    x_values = np.cumsum(data['comp_factors'])[::len(data['comp_factors'])//len(data[plot_type])]
+    window = max(1, int((window * len(x_values))/(x_values[-1])))
 
+    # Серия данных и применение скользящего среднего и стандартной девиации с минимальным периодом 1
+    data_series = pd.Series(data[plot_type])
+    rolling_mean = data_series.rolling(window=window, min_periods=1).mean()
+    rolling_std = data_series.rolling(window=window, min_periods=1).std()
 
-# def plot_training_results(compression_operators, data_dir = "./w"):
-#     plt.figure(figsize=(18, 6))
+    # Обрезка x_values, если размер последнего блока меньше window
+    x_values = x_values[:len(rolling_mean)]
 
-#     # Plot gradient norms
-#     plt.subplot(1, 3, 1)
-#     for op_name in compression_operators.keys():
-#         data = load_training_data(f"{data_dir}/{op_name}_training_data.pt")
-#         plt.semilogy(data['gradient_norms'], label=f'{op_name} Gradient Norms')
-#     plt.xlabel('Step Number')
-#     plt.ylabel('Gradient Norm')
-#     plt.title('Gradient Norms over Training Steps')
-#     plt.legend()
-#     plt.grid(True)
+    # Построение графика в зависимости от типа функции
+    if plot_func == 'semilogy':
+        ax.semilogy(x_values, rolling_mean, label=f'{label} {plot_type}')
+    else:
+        ax.plot(x_values, rolling_mean, label=f'{label} {plot_type}')
 
-#     # Plot losses
-#     plt.subplot(1, 3, 2)
-#     for op_name in compression_operators.keys():
-#         data = load_training_data(f"{data_dir}/{op_name}_training_data.pt")
-#         plt.semilogy(data['losses'], label=f'{op_name} Losses')
-#     plt.xlabel('Step Number')
-#     plt.ylabel('Loss')
-#     plt.title('Losses over Training Steps')
-#     plt.legend()
-#     plt.grid(True)
+    # Заполнение области вокруг среднего значением стандартной девиации, уменьшенной вдвое
+    ax.fill_between(x_values, rolling_mean-rolling_std/2, rolling_mean+rolling_std/2, alpha=0.5)
 
-#     # Plot weights norms
-#     plt.subplot(1, 3, 3)
-#     for op_name in compression_operators.keys():
-#         data = load_training_data(f"{data_dir}/{op_name}_training_data.pt")
-#         plt.plot(data['accuracies'], label=f'{op_name} Accuracy')
-#     plt.xlabel('Step Number')
-#     plt.ylabel('Accuracy')
-#     plt.title('Accuracy over Training Steps')
-#     plt.legend()
-#     plt.grid(True)
-
-#     plt.tight_layout()
-#     plt.show()
+    # Настройка осей и легенды
+    ax.set_xlabel('Cumulative Comp Factor')
+    ax.set_ylabel(plot_type.capitalize())
+    ax.legend()
+    ax.grid(True)
